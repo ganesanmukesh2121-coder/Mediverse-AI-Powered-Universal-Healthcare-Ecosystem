@@ -1,0 +1,147 @@
+# MEDIVERSE REST API SPECIFICATION
+# STATUS: DRAFT — NOT APPROVED FOR IMPLEMENTATION
+# PHASE 2 DESIGN ARTIFACT ONLY
+
+openapi: 3.0.3
+info:
+  title: Mediverse Healthcare Ecosystem REST API
+  description: API contract specification for the Mediverse 3-tier healthcare platform.
+  version: 1.0.0-draft
+servers:
+  - url: https://api.mediverse.local/api/v1
+    description: Local Development / Design Gateway
+
+paths:
+  /auth/login:
+    post:
+      summary: User Login & JWT Token Issuance
+      description: Authenticates user credentials via BCrypt & issues signed JWT access token containing sub, role_id, role, and health_id.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  expiresIn:
+                    type: integer
+                    example: 3600
+                  role:
+                    type: string
+                    example: DOCTOR
+                  healthId:
+                    type: string
+                    example: MV-2026-8A3F9B12
+        '401':
+          description: Invalid Credentials
+        '403':
+          description: Account Status Pending Verification
+
+  /appointments:
+    post:
+      summary: Schedule Consultation Appointment
+      description: Schedules an appointment between a patient and a doctor.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patientId, doctorId, appointmentDate, appointmentType]
+              properties:
+                patientId:
+                  type: string
+                  format: uuid
+                doctorId:
+                  type: string
+                  format: uuid
+                appointmentDate:
+                  type: string
+                  format: date-time
+                appointmentType:
+                  type: string
+                  enum: [IN_PERSON, TELECONSULT]
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Appointment scheduled successfully
+        '400':
+          description: Invalid appointment data
+
+  /records/timeline/{healthId}:
+    get:
+      summary: Fetch Patient Unified Health Timeline
+      description: Retrieves chronological consultation notes, prescriptions, lab reports, and uploads for a patient under active consent.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: healthId
+          in: path
+          required: true
+          schema:
+            type: string
+            example: MV-2026-8A3F9B12
+      responses:
+        '200':
+          description: Health timeline retrieved successfully
+        '403':
+          description: Patient consent required or Admin clinical access denied
+        '404':
+          description: Patient Health ID not found
+
+  /emergency/triage/{healthId}:
+    get:
+      summary: Fetch Emergency Triage Vitals
+      description: Returns minimal life-saving triage parameters under emergency access audit logging.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: healthId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Emergency triage data retrieved
+        '403':
+          description: Emergency role required
+
+  /admin/providers/pending:
+    get:
+      summary: List Pending Provider Applications
+      description: Admin queue listing pending Doctor, Medical Org, and Laboratory registration applications.
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Pending provider queue returned
+        '403':
+          description: Admin role required
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
